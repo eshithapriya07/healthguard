@@ -1,0 +1,207 @@
+' ============================================================
+' HealthGuard - Entity Relationship Diagram
+' Mirrors database/schema.sql exactly (15 tables)
+' ============================================================
+@startuml healthguard-er
+skinparam linetype ortho
+skinparam roundCorner 10
+skinparam entity {
+  BackgroundColor #F7FAFF
+  BorderColor #1458E1
+}
+title HealthGuard ER diagram (MySQL 8 / InnoDB / utf8mb4)
+
+entity "roles" as ROLES {
+  * id : INT <<PK>>
+  --
+  * code : VARCHAR(30) <<UQ>>
+  * name_en : VARCHAR(60)
+  * name_hi : VARCHAR(60)
+}
+
+entity "users" as USERS {
+  * id : INT <<PK>>
+  --
+  * email : VARCHAR(190) <<UQ>>
+  * password_hash : VARCHAR(255)
+  * full_name : VARCHAR(120)
+  * role_id : INT <<FK>>
+  * preferred_language : ENUM(en,hi)
+  * status : ENUM(active,inactive)
+  reset_token : VARCHAR(64)
+  reset_expires_at : DATETIME
+  last_login_at : DATETIME
+}
+
+entity "user_profiles" as PROFILES {
+  * user_id : INT <<PK,FK>>
+  --
+  age : TINYINT
+  gender : ENUM
+  height_cm : DECIMAL
+  weight_kg : DECIMAL
+  blood_group : VARCHAR(5)
+  known_conditions : TEXT
+  allergies : TEXT
+  emergency_contact_name : VARCHAR(120)
+  emergency_contact_phone : VARCHAR(30)
+}
+
+entity "parameter_types" as PARAMS {
+  * id : INT <<PK>>
+  --
+  * code : VARCHAR(30) <<UQ>>
+  name_en : VARCHAR(80)
+  name_hi : VARCHAR(80)
+  unit : VARCHAR(20)
+  value_kind : ENUM(single,bp)
+  min_valid : DECIMAL
+  max_valid : DECIMAL
+  has_trend : TINYINT(1)
+}
+
+entity "health_readings" as READINGS {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  * parameter_id : INT <<FK>>
+  systolic : SMALLINT
+  diastolic : SMALLINT
+  pulse : SMALLINT
+  value : DECIMAL
+  * measured_at : DATETIME
+  notes : VARCHAR(500)
+  <<idx (user_id, parameter_id, measured_at)>>
+}
+
+entity "alert_thresholds" as THRESHOLDS {
+  * id : INT <<PK>>
+  --
+  * parameter_id : INT <<FK>>
+  * severity : ENUM(critical,warning,low)
+  operator : ENUM(7 conditions)
+  value_primary : DECIMAL
+  value_secondary : DECIMAL
+  enabled : TINYINT(1)
+  updated_by : INT <<FK>>
+}
+
+entity "alerts" as ALERTS {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  reading_id : BIGINT <<FK>>
+  parameter_id : INT <<FK>>
+  severity : ENUM(info,trend,low,warning,critical)
+  kind : ENUM(threshold,trend,system)
+  title_en / title_hi : VARCHAR(160)
+  message_en / message_hi : VARCHAR(500)
+  status : ENUM(unread,read,resolved)
+}
+
+entity "reminders" as REMINDERS {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  type : ENUM(medication,appointment,measurement,other)
+  title : VARCHAR(160)
+  * scheduled_at : DATETIME
+  recurrence : ENUM(once,daily,weekly)
+  status : ENUM(scheduled,triggered,done,snoozed)
+  snoozed_until : DATETIME
+}
+
+entity "notifications" as NOTIFICATIONS {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  type : ENUM(alert,reminder,system,sharing)
+  ref_id : BIGINT
+  title_en / title_hi : VARCHAR(160)
+  body_en / body_hi : VARCHAR(500)
+  is_read : TINYINT(1)
+}
+
+entity "chat_messages" as CHAT {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  role : ENUM(user,assistant)
+  content : TEXT
+  language : ENUM(en,hi)
+  source : ENUM(rule,ai)
+}
+
+entity "reports" as REPORTS {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  title : VARCHAR(160)
+  date_from / date_to : DATE
+  parameters : JSON
+  avg_values : JSON
+  alert_count : INT
+  summary_text : VARCHAR(1000)
+}
+
+entity "medical_documents" as DOCS {
+  * id : BIGINT <<PK>>
+  --
+  * user_id : INT <<FK>>
+  title : VARCHAR(160)
+  document_date : DATE
+  file_path : VARCHAR(500)
+  mime_type : VARCHAR(100)
+}
+
+entity "access_permissions" as SHARES {
+  * id : BIGINT <<PK>>
+  --
+  * patient_id : INT <<FK>>
+  * grantee_id : INT <<FK>>
+  items : JSON
+  note : VARCHAR(255)
+  starts_at : DATETIME
+  expires_at : DATETIME
+  status : ENUM(active,revoked,expired)
+}
+
+entity "audit_logs" as AUDIT {
+  * id : BIGINT <<PK>>
+  --
+  user_id : INT <<FK>>
+  action : VARCHAR(60)
+  entity : VARCHAR(60)
+  entity_id : BIGINT
+  detail : VARCHAR(500)
+  ip_address : VARCHAR(64)
+}
+
+entity "system_settings" as SETTINGS {
+  * setting_key : VARCHAR(64) <<PK>>
+  --
+  setting_value : VARCHAR(255)
+  description : VARCHAR(255)
+}
+
+ROLES ||--o{ USERS : "role_id"
+USERS ||--o| PROFILES : "1:1 user_id"
+USERS ||--o{ READINGS : "user_id"
+USERS ||--o{ ALERTS : "user_id"
+USERS ||--o{ REMINDERS : "user_id"
+USERS ||--o{ NOTIFICATIONS : "user_id"
+USERS ||--o{ CHAT : "user_id"
+USERS ||--o{ REPORTS : "user_id"
+USERS ||--o{ DOCS : "user_id"
+USERS ||--o{ AUDIT : "user_id"
+USERS ||--o{ SHARES : "patient_id"
+USERS ||--o{ SHARES : "grantee_id"
+
+PARAMS ||--o{ READINGS : "parameter_id"
+PARAMS ||--o{ THRESHOLDS : "parameter_id"
+PARAMS ||--o{ ALERTS : "parameter_id"
+
+READINGS ||--o{ ALERTS : "reading_id"
+THRESHOLDS }o--|| USERS : "updated_by"
+
+@enduml

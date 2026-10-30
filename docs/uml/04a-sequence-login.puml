@@ -1,0 +1,48 @@
+' ============================================================
+' Sequence 4a - Login -> Language selection -> Dashboard
+' ============================================================
+@startuml seq-login
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+title Login -> Select language -> Role dashboard
+
+actor Patient as U
+participant "Browser\n(React SPA)" as UI
+participant "AuthController\n(Express)" as CTRL
+participant "JWT / bcrypt\nmiddleware" as SEC
+database "MySQL 8\n(healthguard)" as DB
+
+U -> UI : open /login
+UI -> CTRL : POST /api/auth/login {email, password}
+CTRL -> SEC : bcrypt.compare(password, hash)
+SEC -> DB : SELECT user + role  [parameterised]
+DB --> SEC : user row (status = active)
+SEC --> CTRL : credentials valid
+CTRL -> DB : UPDATE users SET last_login_at = NOW()
+CTRL --> UI : 200 { token, user { role, language } }
+UI -> UI : store JWT (localStorage) + AuthContext
+
+UI -> UI : navigate("/language")  full-page screen
+UI -> UI : pre-highlight saved language (user.language)
+U -> UI : click "हिन्दी"
+UI -> CTRL : PUT /api/profile/language { language: "hi" }
+CTRL -> DB : UPDATE users SET preferred_language = 'hi'
+DB --> CTRL : ok
+CTRL --> UI : 200 { language }
+UI -> UI : i18n.changeLanguage("hi") - whole UI switches
+UI -> UI : route by role -> "/"
+
+UI -> CTRL : GET /api/dashboard   [Bearer token]
+CTRL -> SEC : authenticate() verifies JWT
+CTRL -> DB : latest readings + summary + alerts (indexed)
+DB --> CTRL : rows
+CTRL --> UI : 200 { cards, summary, alerts, reminders }
+UI -> U : role dashboard rendered in Hindi
+
+note right of SEC
+  Wrong password -> 401 invalid_credentials
+  inactive account -> 403 account_inactive
+  >10 attempts / 15 min -> 429 (rate limit)
+end note
+
+@enduml

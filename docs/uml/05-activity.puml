@@ -1,0 +1,70 @@
+' ============================================================
+' HealthGuard - Activity Diagram (core flow with swimlanes)
+' User -> UI -> Application Logic -> Database -> Dashboard/Alert/Report
+' ============================================================
+@startuml healthguard-activity
+skinparam activity {
+  BackgroundColor #F7FAFF
+  BorderColor #1458E1
+}
+title Core flow: record a reading to seeing the report
+
+|User|
+start
+:Open HealthGuard and sign in with email + password;
+
+|User interface (React + Tailwind)|
+:Show "Select Your Language / अपनी भाषा चुनें";
+if (language selected?) then (yes)
+  :Switch entire UI (EN / हिं) and save the preference;
+else (no)
+  :Stay on the language screen;
+  stop
+endif
+:Navigate to role dashboard;
+:Enter reading (BP / SpO2 / HR / glucose / temperature / weight) with date-time and notes;
+:Submit form;
+
+|Application logic (Express services)|
+if (input valid for the parameter range?) then (no)
+  |User interface (React + Tailwind)|
+  :Show the field error in the active language;
+  |Application logic (Express services)|
+  stop
+endif
+:Create reading with a parameterised SQL statement;
+
+|Data layer (MySQL 8)|
+:INSERT health_readings (InnoDB, utf8mb4);
+:Load the enabled alert_thresholds rows;
+
+|Application logic (Express services)|
+:AlertEngine.evaluateReading() - critical / warning / low;
+:AlertEngine.findTrendAlerts() - rising trend or 3 abnormal days;
+if (any rule matched?) then (yes)
+  :Build a cautious bilingual message - never a diagnosis;
+  |Data layer (MySQL 8)|
+  :INSERT alerts (unread) and notifications;
+  |Application logic (Express services)|
+  :Optional e-mail via Nodemailer;
+else (no)
+endif
+:Write an audit log entry;
+
+|User interface (React + Tailwind)|
+fork
+  :Refresh the dashboard cards with normal / warning / critical colours;
+fork again
+  :Update the notification bell badge and the alerts page;
+fork again
+  :Render the trend chart for 7 / 30 / custom range;
+fork again
+  :Offer report generation (range + parameters -> PDF);
+end fork
+:Show the disclaimer "This is not medical advice. Consult a qualified doctor.";
+
+|User|
+:Review trends, set reminders, share selected data or download the report;
+stop
+
+@enduml

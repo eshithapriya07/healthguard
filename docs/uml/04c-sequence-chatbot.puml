@@ -1,0 +1,46 @@
+' ============================================================
+' Sequence 4c - Chatbot query in Hindi / English
+' ============================================================
+@startuml seq-chatbot
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+title AI Health Assistant - chatbot query (EN / HI)
+
+actor User as U
+participant "ChatWidget\n(every page)" as UI
+participant "ChatController" as CC
+participant "chatbotService" as BOT
+participant "AlertEngine /\nReadingModel" as CTX
+opt AI_ENABLED = true and AI_API_KEY set
+  participant "External AI API\n(OpenAI compatible)" as AI
+end
+database "MySQL 8" as DB
+
+U -> UI : type "मेरा बीपी कैसा है?" (language = hi)
+UI -> CC : POST /api/chat { message, language: "hi" }
+CC -> BOT : respond(user, message, "hi")
+BOT -> BOT : detectIntent(): trend / alert / parameter / app_help / wellness / refuse / fallback
+
+alt intent = refuse (diagnosis / dosage question)
+  BOT --> CC : refusal text in selected language
+  note right of BOT
+    "मैं कोई बीमारी की पहचान नहीं कर सकता...
+     यह चिकित्सकीय सलाह नहीं है।"
+  end note
+else intent = trend / alert / parameter
+  BOT -> CTX : recent readings, thresholds, latest alerts
+  CTX --> BOT : data
+  BOT -> BOT : build bilingual summary + disclaimer
+else fallback
+  BOT -> AI : optional external API call (12 s timeout)
+  AI --> BOT : reply
+  note right of BOT : on error -> rule-based fallback
+end
+
+BOT -> DB : INSERT chat_messages (user + assistant, language)
+BOT --> CC : { reply, source: rule | ai }
+CC --> UI : 201 { reply, source, language }
+UI -> U : answer rendered in the selected language
+UI -> UI : disclaimer shown under every conversation
+
+@enduml

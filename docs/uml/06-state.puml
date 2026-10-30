@@ -1,0 +1,45 @@
+' ============================================================
+' HealthGuard - State Diagrams
+' (1) Alert lifecycle   (2) Reminder lifecycle
+' ============================================================
+
+@startuml healthguard-state-alert
+title Alert state diagram
+[*] --> generated : alert engine fires\n(threshold or trend rule)
+generated --> unread : row written with status='unread'
+unread --> read : user opens it / "Mark as read"
+unread --> resolved : user acts on it / "Mark as resolved"
+read --> resolved : user marks resolved
+resolved --> [*]
+
+note right of unread
+  Mirrored into notifications
+  (bell badge = unread count).
+end note
+
+note bottom of resolved
+  Alert wording stays cautious in EN and HI;
+  resolving only changes UI state.
+end note
+@enduml
+
+
+@startuml healthguard-state-reminder
+title Reminder state diagram
+[*] --> scheduled : user creates reminder\n(once / daily / weekly)
+scheduled --> triggered : node-cron fires at scheduled_at
+scheduled --> snoozed : user presses "Snooze 10 min"
+triggered --> done : user marks done
+triggered --> scheduled : daily / weekly recurrence advances to next occurrence
+snoozed --> scheduled : snoozed_until reached and cron re-triggers it
+snoozed --> done : user marks done
+snoozed --> scheduled : user edits the reminder
+done --> [*]
+triggered --> [*] : one-time reminder completed
+
+note right of scheduled
+  Due check runs every minute
+  (CRON_SCHEDULE, default */1 * * * *).
+  Each trigger also creates an in-app notification.
+end note
+@enduml

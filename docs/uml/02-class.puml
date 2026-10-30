@@ -1,0 +1,186 @@
+' ============================================================
+' HealthGuard - Class Diagram
+' Domain model with attributes, methods and multiplicities
+' ============================================================
+@startuml healthguard-class
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #F7FAFF
+  BorderColor #1458E1
+  ArrowColor #333333
+}
+title HealthGuard class diagram
+
+class User {
+  - id : Integer {PK}
+  - email : String {unique}
+  - passwordHash : String
+  - fullName : String
+  - preferredLanguage : Enum<en,hi>
+  - status : Enum<active,inactive>
+  - resetToken : String
+  - lastLoginAt : DateTime
+  + register() : User
+  + login() : Token
+  + changePassword(old,new) : Boolean
+  + setPreferredLanguage(lang) : void
+  + resetPassword(token,pwd) : Boolean
+}
+
+class Role {
+  - id : Integer {PK}
+  - code : Enum<patient,caregiver,doctor,admin>
+  - nameEn : String
+  - nameHi : String
+}
+
+class Profile {
+  - age : Integer
+  - gender : Enum
+  - heightCm : Decimal
+  - weightKg : Decimal
+  - bloodGroup : String
+  - knownConditions : Text
+  - allergies : Text
+  - emergencyContact : String
+  + update(data) : void
+}
+
+class ParameterType {
+  - id : Integer {PK}
+  - code : String
+  - nameEn : String
+  - nameHi : String
+  - unit : String
+  - valueKind : Enum<single,bp>
+  - minValid / maxValid : Decimal
+  + validate(value) : Boolean
+}
+
+class HealthReading {
+  - id : Long {PK}
+  - systolic : Integer
+  - diastolic : Integer
+  - pulse : Integer
+  - value : Decimal
+  - measuredAt : DateTime
+  - notes : String
+  + create(data) : HealthReading
+  + edit(data) : void
+  + delete() : void
+  + series(range) : List<Point>
+}
+
+class Threshold {
+  - id : Integer {PK}
+  - severity : Enum<critical,warning,low>
+  - operator : Enum<gte,gt,lte,lt,bp_or_gte,bp_and_gte,bp_or_lte>
+  - valuePrimary : Decimal
+  - valueSecondary : Decimal
+  - enabled : Boolean
+  + evaluate(reading) : Boolean
+  + update(data) : void
+}
+
+class Alert {
+  - id : Long {PK}
+  - severity : Enum<info,trend,low,warning,critical>
+  - kind : Enum<threshold,trend,system>
+  - titleEn / titleHi : String
+  - messageEn / messageHi : String
+  - status : Enum<unread,read,resolved>
+  - createdAt : DateTime
+  + generate(reading) : Alert
+  + markRead() : void
+  + resolve() : void
+}
+
+class Reminder {
+  - id : Long {PK}
+  - type : Enum<medication,appointment,measurement,other>
+  - title : String
+  - scheduledAt : DateTime
+  - recurrence : Enum<once,daily,weekly>
+  - status : Enum<scheduled,triggered,done,snoozed>
+  - snoozedUntil : DateTime
+  + schedule() : void
+  + trigger() : Notification
+  + snooze(minutes) : void
+  + complete() : void
+}
+
+class Notification {
+  - id : Long {PK}
+  - type : Enum<alert,reminder,system,sharing>
+  - titleEn / titleHi : String
+  - bodyEn / bodyHi : String
+  - isRead : Boolean
+  + push() : void
+  + markAllRead() : void
+}
+
+class ChatMessage {
+  - id : Long {PK}
+  - role : Enum<user,assistant>
+  - content : Text
+  - language : Enum<en,hi>
+  - source : Enum<rule,ai>
+  + ask(question,lang) : String
+  + history() : List
+}
+
+class Report {
+  - id : Long {PK}
+  - title : String
+  - dateFrom / dateTo : Date
+  - parameters : JSON
+  - avgValues : JSON
+  - alertCount : Integer
+  - summaryText : String
+  + generate(range,params) : Report
+  + exportPdf() : File
+}
+
+class AccessPermission {
+  - id : Long {PK}
+  - items : JSON
+  - startsAt : DateTime
+  - expiresAt : DateTime
+  - status : Enum<active,revoked,expired>
+  + grant(grantee,items,expiry) : AccessPermission
+  + revoke() : void
+  + isActive() : Boolean
+  + covers(item) : Boolean
+}
+
+class AuditLog {
+  - id : Long {PK}
+  - action : String
+  - entity : String
+  - entityId : Long
+  - detail : String
+  - ipAddress : String
+  - createdAt : DateTime
+  + record(action,detail) : void
+}
+
+User "1" *- "1" Profile : has >
+User "1" *- "1" Role : role >
+User "1" *- "0..*" HealthReading : records >
+User "1" *- "0..*" Alert : receives >
+User "1" *- "0..*" Reminder : sets >
+User "1" *- "0..*" ChatMessage : chats >
+User "1" *- "0..*" Report : generates >
+User "1" *- "0..*" AuditLog : produces >
+
+ParameterType "1" *- "0..*" HealthReading : typed by >
+ParameterType "1" *- "0..*" Threshold : configures >
+ParameterType "1" *- "0..*" Alert : refers to >
+
+Alert "0..*" -- "0..1" HealthReading : raised from >
+User "1" *- "0..*" AccessPermission : grants >
+User "0..*" -- "0..*" AccessPermission : receives >
+Reminder "1" -- "0..*" Notification : creates >
+Alert "1" -- "0..*" Notification : creates >
+
+@enduml

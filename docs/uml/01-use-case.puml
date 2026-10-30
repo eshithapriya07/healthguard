@@ -1,0 +1,87 @@
+' ============================================================
+' HealthGuard - Use Case Diagram
+' Actors: Patient, Caregiver, Doctor, Administrator
+' ============================================================
+@startuml healthguard-usecase
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F2F8FF
+  BorderColor #1B6FF5
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BorderColor #1458E1
+  RoundCorner 15
+}
+
+actor "Patient / User\n(रोगी)" as P
+actor "Caregiver / Family\n(केयरगिवर)" as C
+actor "Doctor / Healthcare\nProfessional (डॉक्टर)" as D
+actor "System Administrator\n(व्यवस्थापक)" as A
+
+rectangle "HealthGuard - Online Health Monitoring & Early Alert System" {
+
+  usecase "Register / Login\nwith email + password" as UC1
+  usecase "Select Language\n(English / हिन्दी)" as UC2
+  usecase "Manage Profile" as UC3
+  usecase "Add / Edit / Delete\nHealth Reading" as UC4
+  usecase "Validate Reading\n(realistic ranges)" as UC4a
+  usecase "View Dashboard &\nLatest Readings" as UC5
+  usecase "View Trends\n(7 / 30 / custom range)" as UC6
+  usecase "Receive Rule-Based\nAlert" as UC7
+  usecase "Receive Notification\n(bell + alerts page)" as UC8
+  usecase "Set / Manage\nReminders" as UC9
+  usecase "Use AI Health\nAssistant (Chatbot)" as UC10
+  usecase "Explain Diagnosis /\nPrescribe Treatment" as UC10a
+  usecase "Generate Health\nReport (PDF)" as UC11
+  usecase "Share Selected Data\nwith expiry / revoke" as UC12
+  usecase "View Shared Data\n(read-only)" as UC13
+  usecase "Manage Users\n(activate / delete / role)" as UC14
+  usecase "Configure Alert\nThresholds" as UC15
+  usecase "Monitor System &\nAudit Logs" as UC16
+  usecase "Change / Reset\nPassword" as UC17
+  usecase "Manage Document\nMetadata" as UC18
+
+  UC4 ..> UC4a : <<include>>
+  UC7 ..> UC8 : <<include>>
+  UC10 ..> UC10a : <<extend>> always refused
+  UC10 ..> UC2 : <<include>>
+}
+
+' ---------------- Patient ----------------
+P --> UC1
+P --> UC2
+P --> UC3
+P --> UC4
+P --> UC5
+P --> UC6
+P --> UC7
+P --> UC9
+P --> UC10
+P --> UC11
+P --> UC12
+P --> UC18
+P --> UC17
+
+' ---------------- Caregiver ----------------
+C --> UC1
+C --> UC2
+C --> UC13
+C --> UC5
+
+' ---------------- Doctor ----------------
+D --> UC1
+D --> UC2
+D --> UC13
+
+' ---------------- Administrator ----------------
+A --> UC1
+A --> UC2
+A --> UC14
+A --> UC15
+A --> UC16
+A --> UC3
+
+@enduml

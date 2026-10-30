@@ -1,0 +1,52 @@
+' ============================================================
+' HealthGuard - Deployment Diagram
+' Browser | Web / app server | MySQL server | external services
+' ============================================================
+@startuml healthguard-deployment
+skinparam componentStyle rectangle
+skinparam sequenceMessageAlign center
+title HealthGuard deployment diagram
+
+node "Client tier" {
+  component "Web Browser\n(Chrome / Edge / Firefox)\nReact SPA + Tailwind" as BROWSER
+  component "HTTPS (TLS 1.2+)\nready configuration" as TLS
+}
+
+node "Application tier" {
+  component "Vite dev server\n(or static dist/ build)" as VITE
+  component "Node.js 18+ runtime" as NODE
+  component "Express REST API\nhelmet | cors | express-validator\nexpress-rate-limit | JWT | bcrypt" as API
+  component "node-cron scheduler\nreminders + share expiry" as CRON
+}
+
+node "Database tier" {
+  component "MySQL 8.0 Server\nInnoDB, utf8mb4\n(healthguard schema)" as MYSQL
+}
+
+node "External services" {
+  component "SMTP relay\n(optional e-mail alerts)" as SMTP
+  component "AI API endpoint\n(optional chatbot replies)" as AI
+}
+
+BROWSER --> TLS : https://healthguard.example
+TLS --> VITE : HTTP :3000 (SPA + /api proxy)
+VITE --> NODE : HTTP :4000 /api/*
+NODE --> API
+API --> MYSQL : TCP 3306\nmysql2, parameterised SQL
+CRON --> API : in-process scheduler
+NODE ..> SMTP : optional (EMAIL_ENABLED)
+NODE ..> AI : optional (AI_ENABLED)
+
+note bottom of MYSQL
+  Schema + seed imported from
+  /database/schema.sql and seed.sql
+  (FK constraints, indexes, demo users).
+end note
+
+note bottom of BROWSER
+  Language preference is stored in
+  users.preferred_language and applied
+  immediately to the whole UI.
+end note
+
+@enduml

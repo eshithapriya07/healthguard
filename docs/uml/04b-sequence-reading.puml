@@ -1,0 +1,50 @@
+' ============================================================
+' Sequence 4b - Add reading -> validation -> store ->
+'              threshold check -> alert -> notification
+' ============================================================
+@startuml seq-reading
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+title Add reading -> validate -> store -> alert -> notify
+
+actor Patient as U
+participant "Readings page\n(React)" as UI
+participant "ReadingController" as RC
+participant "express-validator" as VAL
+participant "AlertEngine\n(service)" as ENG
+participant "NotificationService" as NOTIF
+database "MySQL 8" as DB
+opt EMAIL_ENABLED = true
+  participant "Nodemailer\n(SMTP)" as MAIL
+end
+
+U -> UI : fill BP 191/128 + date + notes, Save
+UI -> RC : POST /api/readings { parameter, systolic, diastolic, ... }
+RC -> VAL : validate (express-validator rules)
+VAL --> RC : ok
+RC -> RC : rangeError(): systolic 50-300, diastolic 30-200, diastolic below systolic
+RC -> DB : INSERT INTO health_readings (parameterised)
+DB --> RC : readingId
+RC -> ENG : processReading(user, reading, parameter)
+ENG -> DB : SELECT alert_thresholds WHERE enabled = 1
+ENG -> ENG : evaluateReading() critical -> warning -> low
+ENG -> ENG : findTrendAlerts(): 3 rising BP readings / 3 abnormal days
+ENG -> DB : INSERT INTO alerts (status = 'unread', en + hi text)
+ENG -> DB : INSERT INTO notifications (bell feed)
+ENG -> NOTIF : push(title, message, language)
+opt EMAIL_ENABLED = true
+  NOTIF -> MAIL : sendAlertEmail(to, message)
+end
+ENG --> RC : created alerts[]
+RC --> UI : 201 { reading, alerts[] }
+UI -> U : "Reading saved. 3 new alert(s) generated"
+UI -> UI : bell badge increments / redirect to /alerts
+
+note over ENG
+  Message wording is cautious in both languages:
+  "Your reading is higher than the usual range.
+   Please consult a qualified doctor."
+  Never a diagnosis or a prescription.
+end note
+
+@enduml

@@ -1,0 +1,66 @@
+' ============================================================
+' HealthGuard - Component Diagram
+' UI | Application Layer | Data Layer | Notification Service |
+' Chatbot / AI API | Translation resources
+' ============================================================
+@startuml healthguard-component
+skinparam packageStyle rectangle
+skinparam component {
+  BackgroundColor #F7FAFF
+  BorderColor #1458E1
+}
+title HealthGuard component diagram
+
+package "Presentation layer (React 18 + Vite + Tailwind)" as UI {
+  [Login / Register /\nLanguage selection screen] as AUTHUI
+  [Dashboard &\nTrend charts (Chart.js)] as DASH
+  [Health Records,\nAlerts, Reminders] as REC
+  [Reports &\nControlled Sharing] as REPU
+  [Admin console] as ADMUI
+  [Chat widget\n(every page)] as CHATUI
+  [Route guards\n(ProtectedRoute)] as GUARD
+  [i18n resources\nen.json / hi.json] as I18N
+}
+
+package "Application layer (Node.js + Express)" as APP {
+  [Routes + express-validator\n(middleware)] as ROUTES
+  [Controllers\n(auth, readings, alerts, reminders,\nchat, reports, sharing, admin)] as CTRL
+  [Services\nAlertEngine | ChatbotService |\nReportService | AuditService | Email] as SVC
+  [Cron scheduler\n(node-cron, reminders + share expiry)] as CRON
+  [Auth: JWT + bcrypt + rate limit] as SEC
+}
+
+package "Data layer (MySQL 8, InnoDB, utf8mb4)" as DATA {
+  [mysql2 connection pool\n(parameterised queries only)] as POOL
+  database "healthguard schema\n15 tables" as SCHEMA
+  [seed data + demo accounts] as SEED
+}
+
+package "External services" as EXT {
+  [SMTP (Nodemailer)\noptional, EMAIL_ENABLED] as SMTP
+  [AI API (OpenAI compatible)\noptional, AI_ENABLED] as AI
+}
+
+AUTHUI --> ROUTES : REST /api
+DASH --> ROUTES
+REC --> ROUTES
+REPU --> ROUTES
+ADMUI --> ROUTES
+CHATUI --> ROUTES
+GUARD --> I18N
+GUARD ..> AUTHUI : redirects
+
+ROUTES --> SEC
+ROUTES --> CTRL
+CTRL --> SVC
+SVC --> POOL
+CRON --> SVC
+SEC --> POOL
+POOL --> SCHEMA
+SEED --> SCHEMA
+SVC ..> SMTP : optional alert e-mail
+SVC ..> AI : optional AI reply\n(rule-based fallback)
+CHATUI ..> I18N : labels in EN / HI
+CTRL ..> I18N : alert + reminder text EN / HI
+
+@enduml

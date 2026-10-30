@@ -1,0 +1,56 @@
+' ============================================================
+' Sequence 4d - Patient shares a report with a caregiver
+' ============================================================
+@startuml seq-share
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+title Patient shares selected data with a caregiver / doctor
+
+actor Patient as P
+participant "Sharing page" as UI
+participant "ShareController" as SC
+participant "SharingModel" as SM
+database "MySQL 8" as DB
+actor "Caregiver /\nDoctor" as G
+participant "SharedWithMe page" as GUI
+
+P -> UI : email + items [bp, spo2, report] + expiry 7 days
+UI -> SC : POST /api/shares { email, items, expiresInDays: 7 }
+SC -> SM : lookup grantee by email (parameterised)
+alt grantee missing or wrong role
+  SC --> UI : 404 user_not_found / 400 invalid_role
+else ok
+  SM -> DB : INSERT INTO access_permissions (active, expires_at = now + 7 d)
+  SC -> DB : INSERT INTO audit_logs action = share.create
+  SC --> UI : 201 { share }
+  UI -> P : "Access shared."
+end
+
+note over P, DB
+  The permission stores EXACTLY which items are visible;
+  the patient can revoke it at any time.
+end note
+
+G -> GUI : sign in (role caregiver/doctor)
+GUI -> SC : GET /api/shared/patients
+SC -> SM : grantedTo(grantee) + activePermission checks
+SM -> DB : SELECT access_permissions WHERE status = active AND (expires_at IS NULL OR expires_at > NOW())
+DB --> SM : rows
+SC --> GUI : 200 { patients, items }
+
+GUI -> SC : GET /api/shared/patients/:id/summary
+SC -> SM : sharedItems(patientId, granteeId)
+SC -> SC : filter cards/summary to shared codes only
+SC --> GUI : 200 { cards (bp, spo2 only) }
+
+GUI -> SC : GET /api/shared/patients/:id/trends?parameter=glucose
+SC -> SM : activePermission(patient, grantee, "glucose")
+SM --> SC : null
+SC --> GUI : 403 forbidden (not shared)
+
+note right of G
+  Revoked or expired permission -> all reads return 403,
+  enforced again on every request (defence in depth).
+end note
+
+@enduml
